@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8"/>
+	<meta name="description" content="" />
+	
+	<title>WebRTC Sample</title>
+
+	<style type="text/css">
+		video {
+			background-color: #000000;
+		}
+		
+		#startBtn {
+			width: 320px;
+			display: block;
+		}
+		
+	</style>
+
+</head>
+<body>
+	
+	<div>
+		<video id="selfView" autoPlay="true" width="320" height="240"></video>
+		<video id="remoteView" style="display: none;" autoPlay="true" width="320" height="240"></video>
+	</div>
+	<button id="startBtn" onclick="startCall();">Start</button>
+
+	<!-- Dependency Classes -->
+	<script src="https://webrtc.github.io/adapter/adapter-latest.js" type="text/javascript"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js" type="text/javascript"></script>
+	<script src="js/signaling.js" type="text/javascript"></script>
+
+	<script type="text/javascript">
+		
+		var rtcConnection, signaling;
+		
+		//Get elements from DOM
+		var selfView = document.getElementById("selfView"),
+			remoteView = document.getElementById("remoteView");
+		
+		//setup connection
+		setupConnection();
+
+		//Setup local cam and signaling server
+		function setupConnection() {
+			
+			//Uncomment to use NodeJS sample
+			signaling = new Signaling("http://localhost:3000");
+			
+			//For own implementation use same API or comment out signaling methods and implement own API
+			signaling.onMessage( onSignalingEvent );
+			
+			//Create new rtc connection
+			rtcConnection = new RTCPeerConnection({iceServers: [{urls: "stun:stun.l.google.com:19305"}]});
+			
+			//Listen to rtc events
+			rtcConnection.onicecandidate = function( evt ) 
+			{
+				//console.log('candidate info', evt.candidate);
+				if( evt.candidate != undefined ) signaling.send( JSON.stringify({"type":"candidate","candidate":evt.candidate }));
+			}
+			
+			rtcConnection.onaddstream = function( evt ) {
+
+				remoteView.setAttribute('style', null);
+
+				//Attach incoming stream to remote view
+				attachMediaStream(remoteView, evt.stream);
+			}
+
+			navigator.mediaDevices.getUserMedia({"video":true, "audio":true})
+			.then( function(stream) {
+				
+				//Attach local media stream to video element
+				attachMediaStream(selfView, stream);
+				
+				//Attach stream to the RTC connection
+				rtcConnection.addStream(stream);
+			})
+			.catch( function( err ) {
+				console.log("##ERROR:There was an error getting the requested media#");
+			});
+		}
+		
+		function startCall() {
+			rtcConnection.createOffer( function( desc ) {
+				
+				//Fires when the offer creates the description
+				rtcConnection.setLocalDescription(desc);
+				signaling.send( JSON.stringify({"type":"sdp","sdp":desc }));
+			},
+
+			//Handle any error calls
+			function() {
+				console.log("##ERROR:There was an error with the description#");
+			});
+		}
+		
+		function onSignalingEvent( event ) {
+		
+			//parse data
+			event = JSON.parse(event);
+			switch( event.type )
+			{
+				case "candidate" : 
+					rtcConnection.addIceCandidate(new RTCIceCandidate(event.candidate));
+					break;
+				case "sdp" :  
+					//Gets description from caller and set it to RTC connection
+					rtcConnection.setRemoteDescription(new RTCSessionDescription(event.sdp));
+					
+					//Create a description to send back to the caller
+					rtcConnection.createAnswer( function(desc) {
+						rtcConnection.setLocalDescription(desc);
+						signaling.send( JSON.stringify({"type":"sdpRemote","sdp":desc }));
+					},
+					//Handles Error
+					function() {
+						console.log("##ERROR:There was an error with the description#");
+					});
+					break;
+				case "sdpRemote" : 
+					//Get the description from the callee and set it to the RTC connection
+					rtcConnection.setRemoteDescription(new RTCSessionDescription(event.sdp));
+					break;
+			}
+		}
+
+		//Attaches the stream to target video element
+		function attachMediaStream( video, stream ) {
+
+			const videoTracks = stream.getVideoTracks();
+			console.log(`Using video device: ${videoTracks[0].label}`);
+			
+			//window.stream = stream; // make variable available to browser console
+			video.srcObject = stream;
+		}
+
+	</script>
+</body>
+</html>
