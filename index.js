@@ -2,7 +2,7 @@
 //Load express and server
 const express = require('express');
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 //Secure options
 //Uncomment below for https secure setup
