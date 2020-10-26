@@ -47,7 +47,7 @@
 		function setupConnection() {
 			
 			//Uncomment to use NodeJS sample
-			signaling = new Signaling("http://localhost:3000");
+			signaling = new Signaling("https://webtrcwk.herokuapp.com/");
 			
 			//For own implementation use same API or comment out signaling methods and implement own API
 			signaling.onMessage( onSignalingEvent );
