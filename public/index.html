@@ -53,7 +53,13 @@
 			signaling.onMessage( onSignalingEvent );
 			
 			//Create new rtc connection
-			rtcConnection = new RTCPeerConnection({iceServers: [{urls: "stun:stun.l.google.com:19305"}]});
+			rtcConnection = new RTCPeerConnection({
+				iceServers: [{
+			  		urls: "turn:relay.backups.cz",
+                          		username: "webrtc",
+                          		credential: "webrtc"
+				}]
+		      	});
 			
 			//Listen to rtc events
 			rtcConnection.onicecandidate = function( evt ) 
